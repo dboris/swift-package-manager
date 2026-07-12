@@ -68,6 +68,14 @@ public struct BuildParameters: Encodable {
 
     /// If set, overrides the SDK root path.
     public var sdkRootOverride: Basics.AbsolutePath?
+    /// WinCatalyst: an explicit override for `currentPlatform` used ONLY for
+    /// manifest platform-condition (`.when(platforms:)`) matching, leaving the
+    /// codegen/link `triple` untouched. Set when the target Swift SDK's toolset
+    /// carries the `-wincatalyst-identity` swiftc flag, so an unmodified package's
+    /// iOS-conditional targets (e.g. fluentui-apple's FluentUI_iOS) resolve while
+    /// the object/link path stays the real (windows/linux/android) triple. See the
+    /// fluentui-apple port plan, slice-0 "Half B".
+    public var platformOverride: PackageModel.Platform?
 
     /// Extra build flags.
     public var flags: BuildFlags
@@ -104,6 +112,14 @@ public struct BuildParameters: Encodable {
 
     /// The current platform we're building for.
     var currentPlatform: PackageModel.Platform {
+        // WinCatalyst identity: honor the explicit override (see `platformOverride`)
+        // so `.when(platforms:)` conditional deps resolve as iOS while the codegen
+        // triple stays windows/linux/android. Safe because the only non-condition
+        // consumer of this (tripleArgs, BuildPlan) is guarded by `triple.isDarwin()`,
+        // which the real triple keeps false.
+        if let platformOverride = self.platformOverride {
+            return platformOverride
+        }
         if self.triple.isDarwin() {
             switch self.triple.darwinPlatform {
             case .iOS(.catalyst):
@@ -173,6 +189,7 @@ public struct BuildParameters: Encodable {
         toolchain: Toolchain,
         triple: Triple? = nil,
         sdkRootOverride: Basics.AbsolutePath? = nil,
+        platformOverride: PackageModel.Platform? = nil,
         flags: BuildFlags,
         buildSystemKind: BuildSystemProvider.Kind,
         pkgConfigDirectories: [Basics.AbsolutePath] = [],
@@ -212,6 +229,7 @@ public struct BuildParameters: Encodable {
         self._toolchain = _Toolchain(toolchain: toolchain)
         self.triple = triple
         self.sdkRootOverride = sdkRootOverride
+        self.platformOverride = platformOverride
         self.buildSystemKind = buildSystemKind
         switch self.debuggingParameters.debugInfoFormat {
         case .dwarf, nil:
