@@ -911,6 +911,17 @@ public final class SwiftCommandState {
     ) throws -> BuildParameters {
         let triple = toolchain.targetTriple
 
+        // WinCatalyst identity (fluentui-apple port, Half B): when the target Swift
+        // SDK's toolset carries the `-wincatalyst-identity` swiftc flag (the
+        // wincatalyst-*-ios SDKs), resolve `.when(platforms:)` conditions as iOS so
+        // an unmodified package's iOS-conditional targets are built -- while codegen
+        // stays the real (windows/linux/android) triple. Tied to the same signal as
+        // the compiler-side identity, so both flip together and only for that SDK.
+        let platformOverride: PackageModel.Platform? =
+            (destination == .target &&
+             toolchain.swiftSDK.toolset.knownTools[.swiftCompiler]?
+                .extraCLIOptions.contains("-wincatalyst-identity") == true) ? .iOS : nil
+
         let dataPath = self.scratchDirectory.appending(
             component: triple.platformBuildPathComponent(buildSystem: self.options.build.buildSystem)
         )
@@ -932,6 +943,7 @@ public final class SwiftCommandState {
             configuration: self.options.build.configuration ?? self.preferredBuildConfiguration,
             toolchain: toolchain,
             triple: triple,
+            platformOverride: platformOverride,
             flags: options.build.buildFlags,
             buildSystemKind: options.build.buildSystem,
             pkgConfigDirectories: options.locations.pkgConfigDirectories,
