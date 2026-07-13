@@ -526,7 +526,14 @@ public final class SwiftCommandState {
                 prefetchBasedOnResolvedFile: options.resolver.shouldEnableResolverPrefetching,
                 shouldCreateMultipleTestProducts: toolWorkspaceConfiguration.wantsMultipleTestProducts || options.build.buildSystem.shouldCreateMultipleTestProducts,
                 createREPLProduct: toolWorkspaceConfiguration.wantsREPLProduct,
-                additionalFileRules: options.build.buildSystem.additionalFileRules,
+                // WinCatalyst identity (fluentui-apple slice 4): the native build
+                // system's rule set omits `.assetCatalog` (only the Xcode/xcbuild
+                // set carries it), so off-Apple SwiftPM drops `.xcassets` as
+                // "unhandled". For the wincatalyst-*-ios SDKs, add the assetCatalog
+                // rule so an unmodified package's catalog is classified as a
+                // processed resource and routed to wincatalyst-assetc at build time.
+                additionalFileRules: options.build.buildSystem.additionalFileRules
+                    + (self.isWinCatalystIdentityTarget ? [FileRuleDescription.assetCatalog] : []),
                 sharedDependenciesCacheEnabled: self.options.caching.useDependenciesCache,
                 fingerprintCheckingMode: self.options.security.fingerprintCheckingMode,
                 signingEntityCheckingMode: self.options.security.signingEntityCheckingMode,
@@ -817,6 +824,18 @@ public final class SwiftCommandState {
     /// Returns the user toolchain to compile the actual product.
     public func getTargetToolchain() throws -> UserToolchain {
         try self._targetToolchain.get()
+    }
+
+    /// WinCatalyst identity (fluentui-apple port, slice 4): true when the TARGET
+    /// Swift SDK's toolset carries the `-wincatalyst-identity` swiftc flag (the
+    /// wincatalyst-*-ios SDKs). The single opt-in signal both the compiler-side
+    /// identity, the Half-B `.when(platforms:)` platformOverride, and the
+    /// `.xcassets` resource rule key off. Best-effort (false if toolchain
+    /// resolution fails) so it can be read from non-throwing contexts.
+    var isWinCatalystIdentityTarget: Bool {
+        guard let toolchain = try? self.getTargetToolchain() else { return false }
+        return toolchain.swiftSDK.toolset.knownTools[.swiftCompiler]?
+            .extraCLIOptions.contains("-wincatalyst-identity") == true
     }
 
     public func getHostToolchain() throws -> UserToolchain {
