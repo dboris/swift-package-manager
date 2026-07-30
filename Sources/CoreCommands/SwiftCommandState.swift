@@ -526,14 +526,21 @@ public final class SwiftCommandState {
                 prefetchBasedOnResolvedFile: options.resolver.shouldEnableResolverPrefetching,
                 shouldCreateMultipleTestProducts: toolWorkspaceConfiguration.wantsMultipleTestProducts || options.build.buildSystem.shouldCreateMultipleTestProducts,
                 createREPLProduct: toolWorkspaceConfiguration.wantsREPLProduct,
-                // WinCatalyst identity (fluentui-apple slice 4): the native build
-                // system's rule set omits `.assetCatalog` (only the Xcode/xcbuild
-                // set carries it), so off-Apple SwiftPM drops `.xcassets` as
-                // "unhandled". For the wincatalyst-*-ios SDKs, add the assetCatalog
-                // rule so an unmodified package's catalog is classified as a
-                // processed resource and routed to wincatalyst-assetc at build time.
+                // WinCatalyst resource pipeline: the native build system's rule set
+                // omits `.assetCatalog` and `.xib` (only the Xcode/xcbuild set
+                // carries them), so off-Apple SwiftPM drops an `.xcassets` or a
+                // `.storyboard` as "unhandled" -- even one the package DECLARES in
+                // `resources:`. When the target Swift SDK ships the resource
+                // compilers, add both rules so those files are classified as
+                // processed resources and routed to wincatalyst-assetc / xib2nib at
+                // build time (`FileRuleDescription.xib` covers nib/xib/storyboard).
+                //
+                // Keyed on the SDK CARRYING THE TOOLS, not on `-wincatalyst-identity`:
+                // an app must be buildable under `-windows`, where its dependencies
+                // keep their non-Darwin arm. See WinCatalystResourceTools.swift.
                 additionalFileRules: options.build.buildSystem.additionalFileRules
-                    + (self.isWinCatalystIdentityTarget ? [FileRuleDescription.assetCatalog] : []),
+                    + (self.winCatalystCarriesResourceTools
+                        ? [FileRuleDescription.assetCatalog, FileRuleDescription.xib] : []),
                 sharedDependenciesCacheEnabled: self.options.caching.useDependenciesCache,
                 fingerprintCheckingMode: self.options.security.fingerprintCheckingMode,
                 signingEntityCheckingMode: self.options.security.signingEntityCheckingMode,
@@ -828,14 +835,31 @@ public final class SwiftCommandState {
 
     /// WinCatalyst identity (fluentui-apple port, slice 4): true when the TARGET
     /// Swift SDK's toolset carries the `-wincatalyst-identity` swiftc flag (the
-    /// wincatalyst-*-ios SDKs). The single opt-in signal both the compiler-side
-    /// identity, the Half-B `.when(platforms:)` platformOverride, and the
-    /// `.xcassets` resource rule key off. Best-effort (false if toolchain
-    /// resolution fails) so it can be read from non-throwing contexts.
+    /// wincatalyst-*-ios SDKs). The opt-in signal for the compiler-side identity and
+    /// the Half-B `.when(platforms:)` platformOverride. Best-effort (false if
+    /// toolchain resolution fails) so it can be read from non-throwing contexts.
+    ///
+    /// NOTE: the resource-compiler rules used to key off this too. They no longer
+    /// do -- see `winCatalystCarriesResourceTools` below. Do not re-weld them: an
+    /// app has to compile its catalogs and storyboards under `-windows`, and this
+    /// flag would additionally resolve every dependency's iOS arm.
     var isWinCatalystIdentityTarget: Bool {
         guard let toolchain = try? self.getTargetToolchain() else { return false }
         return toolchain.swiftSDK.toolset.knownTools[.swiftCompiler]?
             .extraCLIOptions.contains("-wincatalyst-identity") == true
+    }
+
+    /// WinCatalyst resource pipeline: true when the TARGET Swift SDK SHIPS the
+    /// build-time resource compilers (`toolchain/assetc/`, `toolchain/xib2nib/`).
+    /// Independent of identity by design; see WinCatalystResourceTools.swift for why
+    /// the capability is detected as a shipped artifact rather than declared as a
+    /// flag or a toolset key. Best-effort, like the identity accessor above.
+    var winCatalystCarriesResourceTools: Bool {
+        guard let toolchain = try? self.getTargetToolchain() else { return false }
+        return toolchain.swiftSDK.carriesWinCatalystResourceTools(
+            exeSuffix: toolchain.swiftCompilerPath.extension == "exe" ? "exe" : "",
+            fileSystem: self.fileSystem
+        )
     }
 
     public func getHostToolchain() throws -> UserToolchain {

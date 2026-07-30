@@ -29,6 +29,7 @@ add_library(SPMBuildCore
   MainAttrDetection.swift
   ResolvedPackage+Extensions.swift
   Triple+Extensions.swift
+  WinCatalystResourceTools.swift
   XCFrameworkMetadata.swift
   XcodeProjectRepresentation.swift)
 # NOTE(compnerd) workaround for CMake not setting up include flags yet

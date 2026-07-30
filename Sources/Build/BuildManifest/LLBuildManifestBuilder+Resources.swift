@@ -30,26 +30,19 @@ extension LLBuildManifestBuilder {
 
         let infoPlistDestination = try RelativePath(validating: "Info.plist")
 
-        // WinCatalyst identity (fluentui-apple port, slice 4): under the
-        // wincatalyst-*-ios SDKs (platformOverride == .iOS, the same opt-in signal
-        // Half B keys on), an `.xcassets` catalog is compiled at build time by
-        // `wincatalyst-assetc` -- our replacement for Apple's actool -- into
-        // flattened PNGs + a `wincatalyst-assets.plist` manifest at the bundle
-        // resource root (read by UIImage(named:in:), Frameworks/UIKit/UIImage.mm),
-        // instead of copying the raw catalog (which the runtime cannot read).
-        let winCatIdentity = target.buildParameters.platformOverride == .iOS
-
-        // Create a copy (or, for .xcassets under identity, an assetc) command for
-        // each resource file.
+        // Create a copy command for each resource file -- unless WinCatalyst's
+        // resource-compiler table claims it (an `.xcassets`, `.storyboard` or `.xib`
+        // the target Swift SDK ships a compiler for), in which case it is COMPILED
+        // into the bundle rather than copied. A copied catalog or storyboard is one
+        // the runtime cannot read.
         for resource in target.resources {
             switch resource.rule {
             case .copy, .process:
-                if winCatIdentity, resource.path.extension == "xcassets" {
-                    let output = try addWinCatalystAssetCatalogCommand(
-                        catalog: resource.path,
-                        bundlePath: bundlePath,
-                        target: target
-                    )
+                if let output = try addWinCatalystCompiledResourceCommand(
+                    resource: resource.path,
+                    bundlePath: bundlePath,
+                    target: target
+                ) {
                     outputs.append(output)
                     continue
                 }
@@ -74,49 +67,102 @@ extension LLBuildManifestBuilder {
         return .virtual(cmdName)
     }
 
-    /// WinCatalyst identity (fluentui-apple port, slice 4): emit a shell command
-    /// running `wincatalyst-assetc <catalog> <bundlePath>`, which flattens the
-    /// `.xcassets` into PNGs + `wincatalyst-assets.plist` at the bundle resource
-    /// root. Returns the manifest-plist output node (the deterministic primary
-    /// output llbuild sequences the bundle phony on; the PNGs are side outputs).
-    /// The tool ships next to the SDK's swiftc (`<toolchain>/bin/`), staged by
-    /// cmake/sdk-install*.cmake.
-    private func addWinCatalystAssetCatalogCommand(
-        catalog: AbsolutePath,
+    /// WinCatalyst resource pipeline: if this resource is one of the file types a
+    /// WinCatalyst SDK can COMPILE, emit the shell command that compiles it into the
+    /// bundle and return its primary output node; otherwise return nil and let the
+    /// caller copy the file through.
+    ///
+    /// The table, and the on-disk shape each entry produces:
+    ///
+    ///   `.xcassets`   `wincatalyst-assetc <catalog> <bundleDir>`
+    ///                 -> flattened PNGs + `wincatalyst-assets.plist` at the bundle
+    ///                    resource root (read by UIImage(named:in:), UIImage.mm).
+    ///   `.storyboard` `xib2nib <in> <bundleDir>/<name>.storyboardc`
+    ///                 -> a DIRECTORY of per-scene nibs + an Info.plist scene map,
+    ///                    which is what -[UIStoryboard storyboardWithName:bundle:]
+    ///                    reads (UIStoryboard.mm).
+    ///   `.xib`        `xib2nib <in> <bundleDir>/<name>.nib`
+    ///                 -> a single binary NIBArchive (UINib.mm).
+    ///
+    /// Each entry declares ONE deterministic primary output for llbuild to sequence
+    /// the bundle phony on; everything else the tool writes is a side output. For the
+    /// two directory-producing entries that primary output is a FILE INSIDE the
+    /// directory (the manifest plist / the scene map) rather than a directory node.
+    ///
+    /// NOT gated on the `-ios` identity: it is keyed on the target SDK shipping the
+    /// tool, so an app compiles its resources under `-windows` too. See
+    /// SPMBuildCore/WinCatalystResourceTools.swift for why the capability is a
+    /// shipped artifact rather than a flag.
+    private func addWinCatalystCompiledResourceCommand(
+        resource: AbsolutePath,
         bundlePath: AbsolutePath,
         target: ModuleBuildDescription
-    ) throws -> Node {
-        // Host exe suffix from swiftc (swiftc.exe on Windows, swiftc elsewhere) so
-        // the tool name is host-correct.
-        let toolName = target.buildParameters.toolchain.swiftCompilerPath.extension == "exe"
-            ? "wincatalyst-assetc.exe" : "wincatalyst-assetc"
-        // Resolve assetc relative to the target Swift SDK toolset's rootPaths (i.e.
-        // `<Sdk>/toolchain/bin`). This is SWIFT_EXEC-immune: swiftCompilerPath moves
-        // to the STOCK swiftc when the gate sets SWIFT_EXEC for the host manifest
-        // compile, but the toolset root still points at the SDK's own toolchain.
-        // assetc ships in a DEDICATED `<toolchain>/assetc/` dir (a sibling of bin),
-        // self-contained with its interop foundation.dll closure -- it CANNOT live
-        // in toolchain/bin, whose stock swift `Foundation.dll` overlay collides
-        // (case-insensitively) with our `foundation.dll` (sdk-install*.cmake).
-        let rootPaths = target.buildParameters.toolchain.swiftSDK.toolset.rootPaths
-        let candidates = rootPaths.flatMap { root in [
-            root.parentDirectory.appending(components: "assetc", toolName), // <toolchain>/assetc/
-            root.appending(component: toolName),                            // <toolchain>/bin/ (fallback)
-        ] }
-        let assetc = candidates.first(where: { self.fileSystem.exists($0) })
-            ?? candidates.first
-            ?? target.buildParameters.toolchain.swiftCompilerPath.parentDirectory.appending(component: toolName)
+    ) throws -> Node? {
+        let tool: WinCatalystResourceTool
+        let input: Node
+        /// The path handed to the tool as its output argument.
+        let outputArgument: AbsolutePath
+        /// The deterministic file the tool always writes, used as the llbuild output.
+        let primaryOutput: AbsolutePath
+        let description: String
 
-        let input = Node.directory(catalog)
-        let manifestOut = bundlePath.appending(component: "wincatalyst-assets.plist")
-        let output = Node.file(manifestOut)
+        switch resource.extension {
+        case "xcassets":
+            tool = .assetCatalog
+            input = .directory(resource)
+            outputArgument = bundlePath
+            primaryOutput = bundlePath.appending(component: "wincatalyst-assets.plist")
+            description = "Compiling asset catalog \(resource.basename) (wincatalyst-assetc)"
+        case "storyboard":
+            tool = .interfaceBuilder
+            input = .file(resource)
+            let compiledDirectory = bundlePath.appending(
+                component: "\(resource.basenameWithoutExt).storyboardc"
+            )
+            outputArgument = compiledDirectory
+            primaryOutput = compiledDirectory.appending(component: "Info.plist")
+            description = "Compiling storyboard \(resource.basename) (xib2nib)"
+        case "xib":
+            tool = .interfaceBuilder
+            input = .file(resource)
+            outputArgument = bundlePath.appending(component: "\(resource.basenameWithoutExt).nib")
+            primaryOutput = outputArgument
+            description = "Compiling \(resource.basename) (xib2nib)"
+        default:
+            // Includes an already-compiled `.nib`, which FileRuleDescription.xib also
+            // matches: it is copied through, not re-compiled.
+            return nil
+        }
 
+        // Host exe suffix from swiftc (swiftc.exe on Windows, swiftc elsewhere).
+        let exeSuffix = target.buildParameters.toolchain.swiftCompilerPath.extension == "exe"
+            ? "exe" : ""
+        guard let toolPath = target.buildParameters.toolchain.swiftSDK.winCatalystResourceToolPath(
+            tool,
+            exeSuffix: exeSuffix,
+            fileSystem: self.fileSystem
+        ) else {
+            // The SDK classified this file as a processable resource (the rule set is
+            // added when it ships ANY resource tool) but does not carry THIS one.
+            // Fall back to copying, and say so -- a silently copied catalog or
+            // storyboard is unreadable at runtime and would otherwise look fine.
+            self.observabilityScope.emit(
+                warning: """
+                    \(resource.basename) needs \(tool.executableStem), which this Swift SDK does not \
+                    ship (expected in <toolchain>/\(tool.directoryName)/); copying the source file \
+                    through instead -- the runtime cannot read it
+                    """
+            )
+            return nil
+        }
+
+        let output = Node.file(primaryOutput)
         self.manifest.addShellCmd(
-            name: manifestOut.pathString,
-            description: "Compiling asset catalog \(catalog.basename) (wincatalyst-assetc)",
+            name: primaryOutput.pathString,
+            description: description,
             inputs: [input],
             outputs: [output],
-            arguments: [assetc.pathString, catalog.pathString, bundlePath.pathString]
+            arguments: [toolPath.pathString, resource.pathString, outputArgument.pathString]
         )
         return output
     }
