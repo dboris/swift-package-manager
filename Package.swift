@@ -1131,7 +1131,7 @@ let relatedDependenciesBranch = "release/6.3"
 if ProcessInfo.processInfo.environment["SWIFTPM_LLBUILD_FWK"] == nil {
     if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         package.dependencies += [
-            .package(url: "https://github.com/swiftlang/swift-llbuild.git", branch: relatedDependenciesBranch),
+            .package(url: "https://github.com/swiftlang/swift-llbuild.git", revision: "e38525ae3519021f014ad91e7bf86e7ae86044f5"), // release/6.3 (wincatalyst: revision-pinned; branch ref is ambiguous in SwiftPM's mirror)
         ]
     } else {
         // In Swift CI, use a local path to llbuild to interoperate with tools
@@ -1150,7 +1150,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         // These need to match the versions in the swiftlang/swift repo,
         // utils/update_checkout/update-checkout-config.json
         // They are used to build the official swift toolchain.
-        .package(url: "https://github.com/swiftlang/swift-syntax.git", branch: relatedDependenciesBranch),
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", revision: "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1"), // release/6.3 (wincatalyst: revision-pinned)
         .package(url: "https://github.com/apple/swift-argument-parser.git", revision: "1.6.1"),
         .package(url: "https://github.com/apple/swift-crypto.git", revision: "3.12.5"),
         .package(url: "https://github.com/apple/swift-system.git", revision: "1.5.0"),
@@ -1162,8 +1162,8 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     ]
     if !swiftDriverDeps.isEmpty {
         package.dependencies += [
-            .package(url: "https://github.com/swiftlang/swift-tools-support-core.git", branch: relatedDependenciesBranch),
-            .package(url: "https://github.com/swiftlang/swift-driver.git", branch: relatedDependenciesBranch),
+            .package(url: "https://github.com/swiftlang/swift-tools-support-core.git", revision: "44be92e627f754f593ca99f1b0c982e389e9bb20"), // release/6.3 (wincatalyst: revision-pinned)
+            .package(url: "https://github.com/swiftlang/swift-driver.git", revision: "7d6b844f0c2497a997770a11536598b187066be9"), // release/6.3 (wincatalyst: revision-pinned)
         ]
     }
 } else {
@@ -1206,7 +1206,7 @@ if !shouldUseSwiftBuildFramework {
 
     if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         package.dependencies += [
-            .package(url: "https://github.com/swiftlang/swift-build.git", branch: relatedDependenciesBranch),
+            .package(url: "https://github.com/swiftlang/swift-build.git", revision: "470c28f62e2eb396eda7c1c57faaa8566c0ba293"), // release/6.3 (wincatalyst: revision-pinned)
             .package(url: "https://github.com/swiftlang/swift-tools-protocols.git", revision: "0.0.10"),
         ]
     } else {
