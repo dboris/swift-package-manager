@@ -122,13 +122,15 @@ extension LLBuildManifestBuilder {
             )
             outputArgument = compiledDirectory
             primaryOutput = compiledDirectory.appending(component: "Info.plist")
-            description = "Compiling storyboard \(resource.basename) (xib2nib)"
+            // The module is named in the log line so a reader (or a gate probing the
+            // binary for this literal) can tell this rule passes it.
+            description = "Compiling storyboard \(resource.basename) (xib2nib --module \(target.module.c99name))"
         case "xib":
             tool = .interfaceBuilder
             input = .file(resource)
             outputArgument = bundlePath.appending(component: "\(resource.basenameWithoutExt).nib")
             primaryOutput = outputArgument
-            description = "Compiling \(resource.basename) (xib2nib)"
+            description = "Compiling \(resource.basename) (xib2nib --module \(target.module.c99name))"
         default:
             // Includes an already-compiled `.nib`, which FileRuleDescription.xib also
             // matches: it is copied through, not re-compiled.
