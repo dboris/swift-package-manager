@@ -14,6 +14,7 @@ import struct LLBuildManifest.Node
 import struct Basics.AbsolutePath
 import struct Basics.RelativePath
 
+import PackageGraph
 import PackageModel
 import SPMBuildCore
 
@@ -157,12 +158,22 @@ extension LLBuildManifestBuilder {
         }
 
         let output = Node.file(primaryOutput)
+        // xib2nib is told the TARGET'S MODULE NAME, the way ibtool learns it from the
+        // build: Xcode's fresh storyboard says `customModuleProvider="target"` with NO
+        // `customModule`, meaning "the class lives in the module of the target that
+        // compiles me". Without this the compiled nib records the bare class name and
+        // the runtime has to guess the module from the executable's name.
+        var arguments = [toolPath.pathString]
+        if tool == .interfaceBuilder {
+            arguments += ["--module", target.module.c99name]
+        }
+        arguments += [resource.pathString, outputArgument.pathString]
         self.manifest.addShellCmd(
             name: primaryOutput.pathString,
             description: description,
             inputs: [input],
             outputs: [output],
-            arguments: [toolPath.pathString, resource.pathString, outputArgument.pathString]
+            arguments: arguments
         )
         return output
     }
