@@ -84,6 +84,12 @@ extension LLBuildManifestBuilder {
     ///                    reads (UIStoryboard.mm).
     ///   `.xib`        `xib2nib <in> <bundleDir>/<name>.nib`
     ///                 -> a single binary NIBArchive (UINib.mm).
+    ///   `.xcdatamodeld` `wincatalyst-momc <in> <bundleDir>/<name>.momd`
+    ///                 -> one `<version>.mom` per model version + VersionInfo.plist,
+    ///                    which NSPersistentContainer(name:) and
+    ///                    NSManagedObjectModel(contentsOf:) load (CoreData). momc
+    ///                    VALIDATES the model, so a broken one fails the build.
+    ///   `.xcdatamodel` `wincatalyst-momc <in> <bundleDir>/<name>.mom` (one version).
     ///
     /// Each entry declares ONE deterministic primary output for llbuild to sequence
     /// the bundle phony on; everything else the tool writes is a side output. For the
@@ -131,9 +137,28 @@ extension LLBuildManifestBuilder {
             outputArgument = bundlePath.appending(component: "\(resource.basenameWithoutExt).nib")
             primaryOutput = outputArgument
             description = "Compiling \(resource.basename) (xib2nib --module \(target.module.c99name))"
+        case "xcdatamodeld":
+            // A model is a DIRECTORY of versions and so is the compiled bundle; its
+            // VersionInfo.plist is the file momc always writes.
+            tool = .dataModel
+            input = .directory(resource)
+            let compiledDirectory = bundlePath.appending(
+                component: "\(resource.basenameWithoutExt).momd"
+            )
+            outputArgument = compiledDirectory
+            primaryOutput = compiledDirectory.appending(component: "VersionInfo.plist")
+            description = "Compiling data model \(resource.basename) (wincatalyst-momc)"
+        case "xcdatamodel":
+            tool = .dataModel
+            input = .directory(resource)
+            outputArgument = bundlePath.appending(component: "\(resource.basenameWithoutExt).mom")
+            primaryOutput = outputArgument
+            description = "Compiling data model \(resource.basename) (wincatalyst-momc)"
         default:
             // Includes an already-compiled `.nib`, which FileRuleDescription.xib also
-            // matches: it is copied through, not re-compiled.
+            // matches: it is copied through, not re-compiled. Likewise an
+            // `.xcmappingmodel` (FileRuleDescription.coredata matches it): nothing here
+            // compiles a mapping model yet.
             return nil
         }
 
