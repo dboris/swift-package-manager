@@ -534,13 +534,16 @@ public final class SwiftCommandState {
                 // compilers, add both rules so those files are classified as
                 // processed resources and routed to wincatalyst-assetc / xib2nib at
                 // build time (`FileRuleDescription.xib` covers nib/xib/storyboard).
+                // `.coredata` (xcdatamodeld/xcdatamodel) likewise routes a Core Data
+                // model to wincatalyst-momc -- off Apple the rule is absent too, and a
+                // model the package declares was dropped.
                 //
                 // Keyed on the SDK CARRYING THE TOOLS, not on `-wincatalyst-identity`:
                 // an app must be buildable under `-windows`, where its dependencies
                 // keep their non-Darwin arm. See WinCatalystResourceTools.swift.
                 additionalFileRules: options.build.buildSystem.additionalFileRules
                     + (self.winCatalystCarriesResourceTools
-                        ? [FileRuleDescription.assetCatalog, FileRuleDescription.xib] : []),
+                        ? [FileRuleDescription.assetCatalog, FileRuleDescription.xib, FileRuleDescription.coredata] : []),
                 sharedDependenciesCacheEnabled: self.options.caching.useDependenciesCache,
                 fingerprintCheckingMode: self.options.security.fingerprintCheckingMode,
                 signingEntityCheckingMode: self.options.security.signingEntityCheckingMode,

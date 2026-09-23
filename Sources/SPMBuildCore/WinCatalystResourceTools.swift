@@ -41,12 +41,16 @@ public enum WinCatalystResourceTool: CaseIterable {
     /// `.xib`/`.storyboard` -> binary NIBArchive (a `.storyboardc` dir for a
     /// storyboard, a single `.nib` for a xib).
     case interfaceBuilder
+    /// `.xcdatamodeld` -> a `<Name>.momd` directory (`.xcdatamodel` -> `<Name>.mom`):
+    /// the Core Data model compiler, `momc`'s stand-in (win-catalyst tools/momc).
+    case dataModel
 
     /// The dedicated directory the tool ships in, a sibling of `toolchain/bin`.
     public var directoryName: String {
         switch self {
         case .assetCatalog: return "assetc"
         case .interfaceBuilder: return "xib2nib"
+        case .dataModel: return "momc"
         }
     }
 
@@ -55,6 +59,7 @@ public enum WinCatalystResourceTool: CaseIterable {
         switch self {
         case .assetCatalog: return "wincatalyst-assetc"
         case .interfaceBuilder: return "xib2nib"
+        case .dataModel: return "wincatalyst-momc"
         }
     }
 }
