@@ -44,13 +44,16 @@ public enum WinCatalystResourceTool: CaseIterable {
     /// `.xcdatamodeld` -> a `<Name>.momd` directory (`.xcdatamodel` -> `<Name>.mom`):
     /// the Core Data model compiler, `momc`'s stand-in (win-catalyst tools/momc).
     case dataModel
+    /// `.xcmappingmodel` -> `<Name>.cdm`: the Core Data mapping-model compiler, `mapc`'s
+    /// stand-in (win-catalyst tools/momc/mapc.mm), shipped beside momc in its directory.
+    case mappingModel
 
     /// The dedicated directory the tool ships in, a sibling of `toolchain/bin`.
     public var directoryName: String {
         switch self {
         case .assetCatalog: return "assetc"
         case .interfaceBuilder: return "xib2nib"
-        case .dataModel: return "momc"
+        case .dataModel, .mappingModel: return "momc"
         }
     }
 
@@ -60,6 +63,7 @@ public enum WinCatalystResourceTool: CaseIterable {
         case .assetCatalog: return "wincatalyst-assetc"
         case .interfaceBuilder: return "xib2nib"
         case .dataModel: return "wincatalyst-momc"
+        case .mappingModel: return "wincatalyst-mapc"
         }
     }
 }
