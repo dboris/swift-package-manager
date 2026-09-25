@@ -90,6 +90,9 @@ extension LLBuildManifestBuilder {
     ///                    NSManagedObjectModel(contentsOf:) load (CoreData). momc
     ///                    VALIDATES the model, so a broken one fails the build.
     ///   `.xcdatamodel` `wincatalyst-momc <in> <bundleDir>/<name>.mom` (one version).
+    ///   `.xcmappingmodel` `wincatalyst-mapc <in> <bundleDir>/<name>.cdm`
+    ///                 -> the compiled mapping model Core Data's automatic migration
+    ///                    finds in the bundle (NSMappingModel.mm).
     ///
     /// Each entry declares ONE deterministic primary output for llbuild to sequence
     /// the bundle phony on; everything else the tool writes is a side output. For the
@@ -154,11 +157,18 @@ extension LLBuildManifestBuilder {
             outputArgument = bundlePath.appending(component: "\(resource.basenameWithoutExt).mom")
             primaryOutput = outputArgument
             description = "Compiling data model \(resource.basename) (wincatalyst-momc)"
+        case "xcmappingmodel":
+            // A mapping model is a directory (its xcmapping.xml); the compiled .cdm is
+            // one file, which Core Data's automatic migration finds in the bundle. mapc
+            // reads the two models the mapping model names from their sources near it.
+            tool = .mappingModel
+            input = .directory(resource)
+            outputArgument = bundlePath.appending(component: "\(resource.basenameWithoutExt).cdm")
+            primaryOutput = outputArgument
+            description = "Compiling mapping model \(resource.basename) (wincatalyst-mapc)"
         default:
             // Includes an already-compiled `.nib`, which FileRuleDescription.xib also
-            // matches: it is copied through, not re-compiled. Likewise an
-            // `.xcmappingmodel` (FileRuleDescription.coredata matches it): nothing here
-            // compiles a mapping model yet.
+            // matches: it is copied through, not re-compiled.
             return nil
         }
 
