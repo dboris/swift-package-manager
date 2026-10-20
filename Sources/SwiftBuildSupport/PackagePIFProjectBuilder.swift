@@ -290,6 +290,24 @@ struct PackagePIFProjectBuilder {
 
         for resource in resources {
             let resourcePath = resource.path
+
+            // WinCatalyst: a type the target Swift SDK ships a compiler for becomes a custom
+            // task on the bundle target and stays out of BOTH phases -- the resources phase
+            // would copy the source through, and the module's sources phase (asset symbols,
+            // Core Data codegen) has no off-Darwin rule for it. See WinCatalystPIFSupport.swift.
+            if resource.rule != .embedInCode,
+               let resourceAbsolutePath = try? AbsolutePath(validating: resourcePath),
+               let compiled = WinCatalystCompiledResource.make(
+                   resourcePath: resourceAbsolutePath,
+                   moduleC99Name: module.c99name,
+                   fileSystem: self.pifBuilder.fileSystem,
+                   observabilityScope: self.pifBuilder.observabilityScope
+               ) {
+                self.project[keyPath: targetForResourcesKeyPath].customTasks.append(compiled.customTask)
+                self.log(.debug, indent: 2, "Added WinCatalyst compile task for resource '\(resourcePath)'")
+                continue
+            }
+
             // Add a file reference for the resource. We use an absolute path, as for all the other files,
             // but we should be able to optimize this later by making it group-relative.
             let ref = self.project.mainGroup.addFileReference { id in

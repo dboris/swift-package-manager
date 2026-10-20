@@ -22,7 +22,8 @@ add_library(SwiftBuildSupport
   PIFBuilder.swift
   PluginConfiguration.swift
   SwiftBuildSystem.swift
-  SwiftBuildSystemMessageHandler.swift)
+  SwiftBuildSystemMessageHandler.swift
+  WinCatalystPIFSupport.swift)
 target_link_libraries(SwiftBuildSupport PUBLIC
   Basics
   Build

@@ -501,8 +501,13 @@ public final class PIFBuilder {
             let packagesAndPIFBuilders = try await makePIFBuilders(buildParameters: buildParameters)
 
             var modulesAndProducts: [PackagePIFBuilder.ModuleOrProduct] = []
+            let winCatalystContext = WinCatalystPIFContext(buildParameters: buildParameters, fileSystem: self.fileSystem)
             let packagesAndPIFProjects = try packagesAndPIFBuilders.map { (package, pifBuilder, _) in
-                let builtModulesAndProducts = try pifBuilder.build()
+                // WinCatalyst: the identity swap and the SDK's resource compilers (see
+                // WinCatalystPIFSupport.swift); `build()` is synchronous, so the task-local covers it.
+                let builtModulesAndProducts = try WinCatalystPIFContext.$current.withValue(winCatalystContext) {
+                    try pifBuilder.build()
+                }
                 modulesAndProducts.append(contentsOf: builtModulesAndProducts)
                 let pifProject: ProjectModel.Project = pifBuilder.pifProject
                 return (package, pifProject)

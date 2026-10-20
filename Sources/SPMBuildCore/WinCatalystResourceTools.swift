@@ -35,7 +35,7 @@ import PackageModel
 /// same SDK.
 ///
 /// See docs/handoffs/2026-07-29-swiftpm-resource-pipeline.md in win-catalyst.
-public enum WinCatalystResourceTool: CaseIterable {
+public enum WinCatalystResourceTool: CaseIterable, Sendable {
     /// `.xcassets` -> flattened PNGs + `wincatalyst-assets.plist` (our Assets.car).
     case assetCatalog
     /// `.xib`/`.storyboard` -> binary NIBArchive (a `.storyboardc` dir for a

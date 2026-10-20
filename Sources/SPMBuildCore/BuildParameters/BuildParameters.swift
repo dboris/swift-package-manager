@@ -120,6 +120,13 @@ public struct BuildParameters: Encodable {
         if let platformOverride = self.platformOverride {
             return platformOverride
         }
+        return self.platformFromTriple
+    }
+
+    /// The platform the TRIPLE names, ignoring `platformOverride`. WinCatalyst: Swift Build matches
+    /// `.when(platforms:)` against this platform (it never sees `currentPlatform`), so the PIF builder
+    /// needs it to translate the identity override into filters Swift Build will evaluate the same way.
+    public var platformFromTriple: PackageModel.Platform {
         if self.triple.isDarwin() {
             switch self.triple.darwinPlatform {
             case .iOS(.catalyst):

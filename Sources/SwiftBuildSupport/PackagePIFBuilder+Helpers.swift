@@ -308,6 +308,7 @@ extension Sequence<PackageModel.PackageCondition> {
             }
 
             var pifPlatformsForCondition: [ProjectModel.BuildSettings.Platform] = platforms
+                .map(WinCatalystPlatformIdentity.mapCondition)
                 .compactMap { try? ProjectModel.BuildSettings.Platform(from: $0) }
 
             // Treat catalyst like macOS for backwards compatibility with older tools versions.
@@ -769,6 +770,8 @@ extension PackageGraph.ResolvedModule {
                 for platform in platforms {
                     let pifPlatform: ProjectModel.BuildSettings.Platform?
                     if let platform {
+                        // WinCatalyst identity: write the condition as Swift Build must evaluate it.
+                        let platform = WinCatalystPlatformIdentity.mapCondition(platform)
                         guard let computedPifPlatform = try? ProjectModel.BuildSettings.Platform(from: platform) else {
                             observabilityScope.logPIF(.warning, "Ignoring settings assignments for unknown platform '\(platform.name)'")
                             continue
