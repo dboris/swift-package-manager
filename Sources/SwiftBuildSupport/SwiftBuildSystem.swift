@@ -977,9 +977,23 @@ public final class SwiftBuildSystem: SPMBuildCore.BuildSystem {
             }
         }
 
-        if !buildParameters.customToolsetPaths.isEmpty {
+        // WinCatalyst: Swift Build's Android platform DISCARDS a Swift SDK's own toolset as
+        // "redundant" (swift-build SWBAndroidPlatform: `overrideToolsetAbsolutePaths: []`) and
+        // rebuilds the settings from a host NDK -- every other platform, and the native engine,
+        // apply the toolset the SDK ships. An SDK whose toolset carries its compiler and linker
+        // flags (WinCatalyst's: the ObjC interop flags, the whole-archive framework link line,
+        // its own ld.lld) then links nothing. Re-apply it the way `--toolset` does: a user-level
+        // override, evaluated after the NDK's settings, so the SDK's flags and linker win while
+        // the NDK still provides the sysroot and clang resource dir.
+        var toolsetPaths = buildParameters.customToolsetPaths
+        if buildParameters.triple.isAndroid(),
+           buildParameters.toolchain.swiftSDK.swiftSDKManifest != nil,
+           let sdkToolsetPaths = buildParameters.toolchain.swiftSDK.pathsConfiguration.toolsetPaths {
+            toolsetPaths = sdkToolsetPaths + toolsetPaths
+        }
+        if !toolsetPaths.isEmpty {
             settings["SWIFT_SDK_TOOLSETS[__destination_platform=YES]"] =
-                (["$(inherited)"] + buildParameters.customToolsetPaths.map { $0.pathStringWithPosixSlashes })
+                (["$(inherited)"] + toolsetPaths.map { $0.pathStringWithPosixSlashes })
                 .joined(separator: " ")
         }
 
