@@ -221,3 +221,23 @@ struct WinCatalystCompiledResource {
         return result
     }
 }
+
+/// `linkerSettings: [.linkedFramework(...)]` under Swift Build.
+///
+/// The native engine links a declared framework only when the triple supports frameworks
+/// (`ProductBuildDescription`: `if buildParameters.triple.supportsFrameworks`), i.e. on Darwin; a
+/// package that lists `.linkedFramework("UIKit")` unconditionally builds everywhere else with the
+/// framework simply absent from the link. The PIF is platform-neutral, so an unconditional
+/// `-framework` reached lld-link on Windows as an input file ("could not open 'UIKit'"). The flag is
+/// written under the Darwin platforms only, and a condition naming a non-Darwin platform (after the
+/// identity swap) is dropped, which is what the native engine's triple check does.
+enum WinCatalystLinkedFrameworks {
+    static let darwinPlatforms: [ProjectModel.BuildSettings.Platform] = [
+        .macOS, .macCatalyst, .iOS, .tvOS, .watchOS, .xrOS, .driverKit,
+    ]
+
+    static func platforms(for platform: ProjectModel.BuildSettings.Platform?) -> [ProjectModel.BuildSettings.Platform?] {
+        guard let platform else { return Self.darwinPlatforms }
+        return Self.darwinPlatforms.contains(platform) ? [platform] : []
+    }
+}

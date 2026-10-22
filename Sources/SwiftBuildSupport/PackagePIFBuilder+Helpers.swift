@@ -781,22 +781,27 @@ extension PackageGraph.ResolvedModule {
                         pifPlatform = nil
                     }
 
-                    // Handle imparted settings for OTHER_LDFLAGS and prebuilts include paths (always multiple values)
-                    // TODO: Do we realy need to impart OTHER_LDFLAGS?
-                    // TODO: Doing that for the PREBUILT_LIBRARIES was causing duplicate library warnings.
-                    if let multipleValueSetting = multipleValueSetting,
-                        declaration != .PREBUILT_LIBRARIES,
-                        (multipleValueSetting == .OTHER_LDFLAGS || declaration == .PREBUILT_INCLUDE_PATHS) {
-                        allSettings.impartedMultipleValueSettings[pifPlatform, default: [:]][multipleValueSetting, default: []].append(contentsOf: values)
-                    }
+                    // WinCatalyst: frameworks are linked on Darwin only, as the native engine does.
+                    let pifPlatforms = declaration == .LINK_FRAMEWORKS
+                        ? WinCatalystLinkedFrameworks.platforms(for: pifPlatform) : [pifPlatform]
+                    for pifPlatform in pifPlatforms {
+                        // Handle imparted settings for OTHER_LDFLAGS and prebuilts include paths (always multiple values)
+                        // TODO: Do we realy need to impart OTHER_LDFLAGS?
+                        // TODO: Doing that for the PREBUILT_LIBRARIES was causing duplicate library warnings.
+                        if let multipleValueSetting = multipleValueSetting,
+                            declaration != .PREBUILT_LIBRARIES,
+                            (multipleValueSetting == .OTHER_LDFLAGS || declaration == .PREBUILT_INCLUDE_PATHS) {
+                            allSettings.impartedMultipleValueSettings[pifPlatform, default: [:]][multipleValueSetting, default: []].append(contentsOf: values)
+                        }
 
-                    for configuration in configurations {
-                        if let multipleValueSetting = multipleValueSetting {
-                            // Handle multiple value settings
-                            allSettings.targetMultipleValueSettings[configuration, default: [:]][pifPlatform, default: [:]][multipleValueSetting, default: []].append(contentsOf: values)
-                        } else if let singleValueSetting = singleValueSetting, let singleValue = values.only {
-                            // Handle single value settings
-                            allSettings.targetSingleValueSettings[configuration, default: [:]][pifPlatform, default: [:]][singleValueSetting] = singleValue
+                        for configuration in configurations {
+                            if let multipleValueSetting = multipleValueSetting {
+                                // Handle multiple value settings
+                                allSettings.targetMultipleValueSettings[configuration, default: [:]][pifPlatform, default: [:]][multipleValueSetting, default: []].append(contentsOf: values)
+                            } else if let singleValueSetting = singleValueSetting, let singleValue = values.only {
+                                // Handle single value settings
+                                allSettings.targetSingleValueSettings[configuration, default: [:]][pifPlatform, default: [:]][singleValueSetting] = singleValue
+                            }
                         }
                     }
                 }
