@@ -1189,7 +1189,7 @@ if !shouldUseSwiftBuildFramework {
 
     if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         package.dependencies += [
-            .package(url: "https://github.com/dboris/swift-build.git", revision: "989e142223cfb6b62f34ccd651c5e78c9e9f3f72"), // wincatalyst: the swift-build fork harmony/wincatalyst-6.4.1 (swift-6.4.1-RELEASE 495f7280 + host tools on a same-platform Swift SDK + Windows Ld without -dependency_info). The revision pins do not resolve remotely (swift-build/driver still ask for llbuild's release/6.4.x branch): build with SWIFTCI_USE_LOCAL_DEPS=1 and ../swift-build on that branch
+            .package(url: "https://github.com/dboris/swift-build.git", revision: "2d2f4ca4eb9420b1e1f32c1f69f3b87f4643270b"), // wincatalyst: the swift-build fork harmony/wincatalyst-6.4.1 (swift-6.4.1-RELEASE 495f7280 + host tools on a same-platform Swift SDK + Windows Ld without -dependency_info + a Windows Touch that touches its input). The revision pins do not resolve remotely (swift-build/driver still ask for llbuild's release/6.4.x branch): build with SWIFTCI_USE_LOCAL_DEPS=1 and ../swift-build on that branch
             .package(url: "https://github.com/swiftlang/swift-tools-protocols.git", revision: "4345e69c5572ec3d1f737fba90bca024b32da5cf"), // swift-6.4.1-RELEASE scheme (wincatalyst: revision-pinned; branch ref is ambiguous in SwiftPM's mirror)
         ]
     } else {
