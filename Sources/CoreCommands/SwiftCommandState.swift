@@ -937,8 +937,24 @@ public final class SwiftCommandState {
     /// flag would additionally resolve every dependency's iOS arm.
     var isWinCatalystIdentityTarget: Bool {
         guard let toolchain = try? self.getTargetToolchain() else { return false }
-        return toolchain.swiftSDK.toolset.knownTools[.swiftCompiler]?
-            .extraCLIOptions.contains("-wincatalyst-identity") == true
+        return Self.winCatalystIdentityPlatform(
+            toolchain.swiftSDK.toolset.knownTools[.swiftCompiler]?.extraCLIOptions ?? []) != nil
+    }
+
+    /// The platform a WinCatalyst identity SDK presents, read from its swiftc options:
+    /// `-wincatalyst-identity-platform <ios|macos>` (the value is the next option that
+    /// is not a `-Xfrontend` forwarder), else iOS for a bare `-wincatalyst-identity`,
+    /// else nil (no identity: `.when(platforms:)` keys on the real triple).
+    static func winCatalystIdentityPlatform(_ options: [String]) -> PackageModel.Platform? {
+        if let flag = options.firstIndex(of: "-wincatalyst-identity-platform"),
+           let value = options[(flag + 1)...].first(where: { $0 != "-Xfrontend" }) {
+            switch value {
+            case "macos": return .macOS
+            case "ios": return .iOS
+            default: break
+            }
+        }
+        return options.contains("-wincatalyst-identity") ? .iOS : nil
     }
 
     /// WinCatalyst resource pipeline: true when the TARGET Swift SDK SHIPS the
@@ -1069,10 +1085,12 @@ public final class SwiftCommandState {
         // an unmodified package's iOS-conditional targets are built -- while codegen
         // stays the real (windows/linux/android) triple. Tied to the same signal as
         // the compiler-side identity, so both flip together and only for that SDK.
-        let platformOverride: PackageModel.Platform? =
-            (destination == .target &&
-             toolchain.swiftSDK.toolset.knownTools[.swiftCompiler]?
-                .extraCLIOptions.contains("-wincatalyst-identity") == true) ? .iOS : nil
+        // The macOS identity (`-wincatalyst-identity-platform macos`, the AppKit SDK)
+        // resolves them as macOS the same way.
+        let platformOverride: PackageModel.Platform? = destination == .target
+            ? Self.winCatalystIdentityPlatform(
+                toolchain.swiftSDK.toolset.knownTools[.swiftCompiler]?.extraCLIOptions ?? [])
+            : nil
 
         let dataPath = self.scratchDirectory.appending(
             component: triple.platformBuildPathComponent(buildSystem: self.options.build.buildSystem)
