@@ -166,6 +166,15 @@ extension LLBuildManifestBuilder {
             outputArgument = bundlePath.appending(component: "\(resource.basenameWithoutExt).cdm")
             primaryOutput = outputArgument
             description = "Compiling mapping model \(resource.basename) (wincatalyst-mapc)"
+        case "xcstrings":
+            // Per-language .strings / .stringsdict into the bundle; the stamp the tool writes
+            // (beside the bundle, named by the catalog's directory and name) is the output.
+            tool = .stringCatalog
+            input = .file(resource)
+            outputArgument = bundlePath
+            primaryOutput = bundlePath.parentDirectory.appending(components:
+                "wincatalyst-xcstrings", "\(bundlePath.basenameWithoutExt)-\(resource.parentDirectory.basename)-\(resource.basenameWithoutExt).outputs")
+            description = "Compiling string catalog \(resource.basename) (wincatalyst-xcstrings)"
         default:
             // Includes an already-compiled `.nib`, which FileRuleDescription.xib also
             // matches: it is copied through, not re-compiled.
@@ -204,7 +213,12 @@ extension LLBuildManifestBuilder {
         if tool == .interfaceBuilder {
             arguments += ["--module", target.module.c99name]
         }
-        arguments += [resource.pathString, outputArgument.pathString]
+        if tool == .stringCatalog {
+            arguments += ["compile", resource.pathString, "--output-directory", outputArgument.pathString,
+                          "--stamp", primaryOutput.pathString]
+        } else {
+            arguments += [resource.pathString, outputArgument.pathString]
+        }
         self.manifest.addShellCmd(
             name: primaryOutput.pathString,
             description: description,

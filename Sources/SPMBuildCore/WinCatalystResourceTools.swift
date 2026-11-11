@@ -47,6 +47,11 @@ public enum WinCatalystResourceTool: CaseIterable, Sendable {
     /// `.xcmappingmodel` -> `<Name>.cdm`: the Core Data mapping-model compiler, `mapc`'s
     /// stand-in (win-catalyst tools/momc/mapc.mm), shipped beside momc in its directory.
     case mappingModel
+    /// `.xcstrings` -> `<lang>.lproj/<Table>.strings` / `.stringsdict`: the String Catalog
+    /// compiler, `xcstringstool compile`'s stand-in (win-catalyst tools/xcstrings, lesson #1211).
+    /// Which files a catalog yields depends on its contents, so the build's declared output is
+    /// the stamp the tool writes (`--stamp`), listing them.
+    case stringCatalog
 
     /// The dedicated directory the tool ships in, a sibling of `toolchain/bin`.
     public var directoryName: String {
@@ -54,6 +59,7 @@ public enum WinCatalystResourceTool: CaseIterable, Sendable {
         case .assetCatalog: return "assetc"
         case .interfaceBuilder: return "xib2nib"
         case .dataModel, .mappingModel: return "momc"
+        case .stringCatalog: return "xcstrings"
         }
     }
 
@@ -64,6 +70,7 @@ public enum WinCatalystResourceTool: CaseIterable, Sendable {
         case .interfaceBuilder: return "xib2nib"
         case .dataModel: return "wincatalyst-momc"
         case .mappingModel: return "wincatalyst-mapc"
+        case .stringCatalog: return "wincatalyst-xcstrings"
         }
     }
 }

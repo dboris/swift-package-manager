@@ -153,6 +153,15 @@ struct WinCatalystCompiledResource {
             outputArgument = "\(resourceDir)/\(stem).cdm"
             primaryOutput = outputArgument
             description = "Compiling mapping model \(resourcePath.basename) (wincatalyst-mapc)"
+        case "xcstrings":
+            // Per-language .strings / .stringsdict at the resource root (a catalog under
+            // `mul.lproj/` too: its tables are `<lang>.lproj/<Interface>.strings`). The stamp,
+            // named by the catalog's directory and name (two `Localizable.xcstrings` can share a
+            // target), lists what was written.
+            tool = .stringCatalog
+            outputArgument = resourceDir
+            primaryOutput = "$(TARGET_TEMP_DIR)/wincatalyst-xcstrings/\(resourcePath.parentDirectory.basename)-\(stem).outputs"
+            description = "Compiling string catalog \(resourcePath.basename) (wincatalyst-xcstrings)"
         default:
             return nil
         }
@@ -174,7 +183,12 @@ struct WinCatalystCompiledResource {
         if tool == .interfaceBuilder {
             commandLine += ["--module", moduleC99Name]
         }
-        commandLine += [resourcePath.pathString, outputArgument]
+        if tool == .stringCatalog {
+            // xcstringstool's own command line, plus the stamp.
+            commandLine += ["compile", resourcePath.pathString, "--output-directory", outputArgument, "--stamp", primaryOutput]
+        } else {
+            commandLine += [resourcePath.pathString, outputArgument]
+        }
 
         // A catalog / model / mapping model is a DIRECTORY, and a custom task's inputs are
         // file nodes: list its files so an edit inside it reruns the task. (A file ADDED
